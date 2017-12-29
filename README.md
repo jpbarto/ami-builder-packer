@@ -89,3 +89,5 @@ git push origin master
     - A) You haven't chosen a VPC Public Subnet, and therefore Packer cannot connect to the instance
     - B) There may have been a connectivity issue between Packer and EC2; retrying the build step within AWS CodePipeline should work just fine 
 
+## Next steps
+* Incorporate Inspector reports as a part of the build pipeline [Golden AMI Vulnerability Assessments](https://aws.amazon.com/blogs/security/how-to-set-up-continuous-golden-ami-vulnerability-assessments-with-amazon-inspector/)

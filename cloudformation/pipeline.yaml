@@ -78,6 +78,13 @@ Resources:
     # Build #
     #########
 
+    PrivateKeyParameter:
+        Type: AWS::SSM::Parameter
+        Properties:
+            Name: "compliance:signature:privateKey"
+            Type: String
+            Value: "Complete me"
+
     # S3 Bucket that CodePipeline/CodeBuild service will use
     # It will receive both SourceZip (CodeCommit Git HEAD) and BuiltZIP (CodeBuild Artifacts)
     BuildArtifactsBucket:
@@ -122,6 +129,12 @@ Resources:
                           - 's3:GetObjectVersion'
                           - 's3:PutObject'
                         Resource: !Sub 'arn:aws:s3:::${BuildArtifactsBucket}/*'
+
+                        Sid: "CodeBuildParameterStoreAccess"
+                        Effect: Allow
+                        Action:
+                          - 'ssm:GetParameters'
+                        Resource: !GetAtt PrivateKeyParameter.Arn
 
 
     CodeBuildProject:
