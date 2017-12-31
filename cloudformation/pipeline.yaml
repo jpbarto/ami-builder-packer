@@ -19,6 +19,14 @@ Parameters:
         Type: AWS::EC2::Subnet::Id
         Description: Public Subnet ID that AMI Builder will use to launch temporary resource
 
+    BuilderPrivateKey:
+        Type: String
+        Description: Base64-encoded private key for signing AMIs
+
+    BuilderPublicKey:
+        Type: String
+        Description: Base64-encoded public key for verifying AMI signatures
+
     NotificationEmailAddress:
         Type: String
         Description: Email to receive new AMI ID created by AMI Builder
@@ -42,11 +50,17 @@ Metadata:
           default: "Packer - CodeBuild environment"
         Parameters: 
           - CodeBuildEnvironment
+      - Label:
+          default: "AMI Builder - Signing"
+        Parameters:
+          - BuilderPrivateKey
+          - BuilderPublicKey
       - 
         Label: 
           default: "AMI Builder - Notifications"
         Parameters: 
           - NotificationEmailAddress         
+
     ParameterLabels:
       ServiceName:
         default: "CodeCommit repo and Pipeline name?"
@@ -54,6 +68,10 @@ Metadata:
         default: "Which VPC should I use?"
       BuilderPublicSubnet: 
         default: "Which Public Subnet should I use?"
+      BuilderPrivateKey:
+        default: "What private key should I use?"
+      BuilderPublicKey:
+        default: "What public key should I use?"
       CodeBuildEnvironment: 
         default: "Should I use a different Docker Image?"
       NotificationEmailAddress:
@@ -81,9 +99,18 @@ Resources:
     PrivateKeyParameter:
         Type: AWS::SSM::Parameter
         Properties:
-            Name: "compliance:signature:privateKey"
+            Name: "compliance.signature.privateKey"
+            Description: "Base64 encoded private key for signing approved AMIs"
             Type: String
-            Value: "Complete me"
+            Value: !Ref BuilderPrivateKey
+
+    PublicKeyParameter:
+        Type: AWS::SSM::Parameter
+        Properties:
+            Name: "compliance.signature.publicKey"
+            Description: "Base64 encoded public key for verifying signed AMIs"
+            Type: String
+            Value: !Ref BuilderPublicKey
 
     # S3 Bucket that CodePipeline/CodeBuild service will use
     # It will receive both SourceZip (CodeCommit Git HEAD) and BuiltZIP (CodeBuild Artifacts)
@@ -134,7 +161,8 @@ Resources:
                         Effect: Allow
                         Action:
                           - 'ssm:GetParameters'
-                        Resource: !GetAtt PrivateKeyParameter.Arn
+                        Resource: 
+                          - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${PrivateKeyParameter}'
 
 
     CodeBuildProject:
