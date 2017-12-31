@@ -12,7 +12,7 @@
     "source_ami_filter": {
         "filters": {
             "virtualization-type": "hvm",
-            "name": "amzn-ami*-ebs",
+            "name": "amzn-ami-hvm-*-ebs",
             "root-device-type": "ebs"
         },
         "owners": ["137112412989", "591542846629", "801119661308",
@@ -36,7 +36,7 @@
       "Name": "{{user `ami_name`}}"
     },
     "ami_description": "Amazon Linux CIS with Cloudwatch Logs agent",
-    "ami_regions": ["eu-west-1", "eu-west-2", "eu-central-1", "us-east-1"],
+    "ami_regions": ["eu-west-1", "us-east-1", "eu-central-1"],
     "associate_public_ip_address": "true",
     "vpc_id": "{{user `vpc`}}",
     "subnet_id": "{{user `subnet`}}"

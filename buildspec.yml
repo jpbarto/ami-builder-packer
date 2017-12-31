@@ -1,5 +1,9 @@
 version: 0.2
 
+env:
+  parameter-store:
+    PRIVATE_KEY: "compliance.signature.privateKey"
+
 phases:
   pre_build:
     commands:
@@ -12,7 +16,7 @@ phases:
       - ./packer build -machine-readable -color=false packer_cis.json | tee build.log
   post_build:
     commands:
-      - echo "Running post_build script"
+      - echo "Running post build script"
       - bash post_build.sh
       - echo "build completed on `date`"
 artifacts:
