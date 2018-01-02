@@ -11,7 +11,7 @@ from Crypto.Hash import SHA256, SHA
 import base64
 
 logger = logging.getLogger ('lambda.handler')
-logger.setLevel (logging.INFO)
+logger.setLevel (logging.DEBUG)
 
 ec2_client = None
 
@@ -23,7 +23,7 @@ def handler(event, context):
 
     logger.info ("Handling event: {0}".format (json.dumps(event)))
 
-    instanceId = event['detail']['instance-id']
+    instance_id = event['detail']['instance-id']
     region = event['region']
 
     # The EC2 may not be running in the same region as the Lambda function
@@ -31,10 +31,10 @@ def handler(event, context):
     # The Lambda assumes it is in the same region as its SSM Parameter Store
     ssm_client = boto3.client ('ssm')
 
-    instance_info = ec2_client.describe_instances (InstanceIds = [instanceId])
+    instance_info = ec2_client.describe_instances (InstanceIds = [instance_id])
     instance_info = instance_info['Reservations'][0]['Instances'][0]
-    if instance_info['InstanceId'] != instanceId:
-        return {"Error": "Instance {0} not found: {1}".format (instanceId, instance_info)}
+    if instance_info['InstanceId'] != instance_id:
+        return {"Error": "Instance {0} not found: {1}".format (instance_id, instance_info)}
     logger.info ("Retrieved details for instance: {0}".format (instance_info))
 
     image_id = instance_info['ImageId']
@@ -66,6 +66,6 @@ def handler(event, context):
             logger.error ("No parameter returned by SSM")
 
     if not image_approved:
-        stopInstance ()
+        stopInstance (instance_id)
 
-    return {"instance": instanceId, "approved_image": image_approved}
+    return {"instance": instance_id, "approved_image": image_approved}
