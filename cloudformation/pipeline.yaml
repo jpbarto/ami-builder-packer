@@ -346,6 +346,89 @@ Resources:
               Id: "NewAMI-Notify"
               Arn: !Ref AmiBuilderNotificationTopic
 
+    ######################
+    # AMI Compliance     #
+    ######################
+    ComplianceRole:
+      Type: AWS::IAM::Role
+      Properties:
+          Path: '/managed/'      
+          AssumeRolePolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - 
+                  Action: 'sts:AssumeRole'
+                  Effect: Allow
+                  Principal:
+                    Service: 
+                      - lambda.amazonaws.com
+          Policies:
+              - PolicyName: LambdaCloudWatchLogsPolicy
+                PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                      - 
+                        Action: 
+                          - "logs:CreateLogGroup"
+                          - "logs:CreateLogStream"
+                          - "logs:PutLogEvents"
+                        Effect: Allow
+                        Resource: 
+                          - "*"
+              - PolicyName: CompliancePublicKeyReadPolicy
+                PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                      - Action:
+                          - 'ssm:GetParameters'
+                        Effect: Allow
+                        Resource: 
+                          - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${PublicKeyParameter}'
+              - PolicyName: ComplianceEC2EnforcementPolicy
+                PolicyDocument:
+                  Version: '2012-10-17'
+                  Statement:
+                      - Action:
+                          - "ec2:DescribeImages"
+                          - "ec2:DescribeInstances"
+                          - "ec2:StopInstances"
+                        Effect: Allow
+                        Resource: 
+                          - "*"
+
+    ComplianceLambda:
+      Type: "AWS::Lambda::Function"
+      Properties:
+        Code: ../compliance_lambda/dist/compliance_lambda.zip
+        Handler: lambda.handler
+        Role: !GetAtt ComplianceRole.Arn
+        Runtime: python2.7
+
+    ComplianceEvent:
+      Type: "AWS::Events::Rule"
+      Properties:
+        Description: "Ensure use of approved AMI upon EC2 launch"
+        EventPattern:
+          source: 
+            - "aws.ec2"
+          detail-type: 
+            - "EC2 Instance State-change Notification"
+          detail: 
+            state: 
+            - "pending"
+            - "running"
+        State: "ENABLED"
+        Targets:
+          - Id: "EC2-Compliance-Check"
+            Arn: !GetAtt ComplianceLambda.Arn
+
+    PermissionForEventsToInvokeLambda: 
+      Type: "AWS::Lambda::Permission"
+      Properties: 
+        FunctionName: !Ref ComplianceLambda
+        Action: "lambda:InvokeFunction"
+        Principal: "events.amazonaws.com"
+        SourceArn: !GetAtt ComplianceEvent.Arn
 
 Outputs:
 
