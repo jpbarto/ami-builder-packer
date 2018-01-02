@@ -1,0 +1,7 @@
+compliance_lambda/bin/*
+compliance_lambda/dist*
+compliance_lambda/include/*
+compliance_lambda/lib/*
+compliance_lambda/pip-selfcheck.json
+compliance_lambda/.Python
+cloudformation/*-package.yaml
