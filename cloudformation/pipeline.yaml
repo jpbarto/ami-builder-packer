@@ -391,6 +391,7 @@ Resources:
                       - Action:
                           - "ec2:DescribeImages"
                           - "ec2:DescribeInstances"
+                          - "ec2:DescribeTags"
                           - "ec2:StopInstances"
                         Effect: Allow
                         Resource: 
