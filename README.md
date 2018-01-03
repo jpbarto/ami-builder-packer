@@ -34,6 +34,18 @@ Cloudformation will create the following resources as part of the AMI Builder fo
 
 ## HOWTO
 
+### Deployment overview
+- cd comopliance_lambda && sh create-deployment-package.sh
+- aws cloudformation package --template-file cloudformation/pipeline.yaml --s30bucket bucket-for-hosting-lambda-deployment-package --output-template-file cloudformation/pipeline-package.yaml
+- Generate a Base64 encoded public and private key for signing created AMIs, a convenience script, `generate_keys.sh` is provided
+- From the console create a CloudFormation stack using pipeline-package.yaml
+- On the CloudWatch Rules console, disable the newly created rule
+- Checkout the resulting CodeCommit repo
+- Copy the ami_source directory to the cloned repository and check in the new files
+- Let CodePipeline build the AMI and sign the AMI
+- Re-enable the CloudWatch Rule when the AMI is built
+- Update the CodeCommit project's `packer_cis.json` file to use approved signed images to build future images
+
 **Before you start**
 
 * Install [GIT](https://git-scm.com/downloads) if you don't have it
