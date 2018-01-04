@@ -8,7 +8,8 @@
 #####
 
 # clean the target and working space
-rm -fr dist/* dist-build/*
+rm -fr dist dist-build
+mkdir dist dist-build
 
 # copy the Lambda function, requirements file and Docker build script to the working space
 cp lambda.py dist-build
