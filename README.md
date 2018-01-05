@@ -1,22 +1,31 @@
 ## Purpose
 
-This Packer AMI Builder creates a new AMI out of the latest Amazon Linux AMI, and also provides a cloudformation template that leverages AWS CodePipeline to 
-orchestrate the entire process.
+This project aims to demonstrate how AWS services can be used to help customers create an Amazon Machine Image (AMI) maintained as code.  The project will demonstrate how to create an AMI using Hashicorp Packer and Ansible as well as how to enforce usage of these AMIs in your environment using AWS Lambda for autocompliance.
+
+The project is made up of a CloudFormation template which will provision resources in your AWS account.  It also provides a sample AMI source project that can be checked into a Git repository hosted by AWS CodeCommit.  Once the source code for the AMI is committed AWS CodePipeline will build the source code using AWS CodeBuild to generate an AMI.  The CodeBuild project will further cryptographically sign the AMI after it is generated.  Using CloudWatch Events and AWS Lambda a rule is also created so that no EC2 instances can be created in your environment that are not using your signed, managed AMIs.
 
 ![Packer AMI Builder Diagram](images/ami-builder-diagram.png)
 
 ## Source code structure
 
 ```bash
-├── ansible
-│   ├── playbook.yaml                       <-- Ansible playbook file
-│   ├── requirements.yaml                   <-- Ansible Galaxy requirements containing additional Roles to be used (CIS, Cloudwatch Logs)
-│   └── roles
-│       ├── common                          <-- Upgrades all packages through ``yum``
-├── buildspec.yml                           <-- CodeBuild spec 
+|
 ├── cloudformation                          <-- Cloudformation to create entire pipeline
 │   └── pipeline.yaml
-├── packer_cis.json                         <-- Packer template for Pipeline
+├── ami_source                              <-- Source code for AMI
+|   ├── packer_cis.json                     <-- Packer template for Pipeline
+|   ├── buildspec.yml                       <-- CodeBuild spec 
+│   └── post_build.sh                       <-- Shell script for post-AMI build processing
+│   └── ansible
+│       ├── playbook.yaml                   <-- Ansible playbook file
+│       ├── requirements.yaml               <-- Ansible Galaxy requirements containing additional Roles to be used (CIS, Cloudwatch Logs)
+│       └── roles
+│           └── common                      <-- Upgrades all packages through ``yum``
+└── compliance_lambda
+    ├── lambda.py                           <-- Lambda function to enforce compliance with managed AMIs
+    ├── build-deps.sh                       <-- Shell script called by deployment package script which builds Lambda-compatible Python dependency modules
+    ├── create-deployment-package.sh        <-- Shell script to create Lambda deployment package
+    └── requirements.txt                    <-- Python requirements file for Lambda function
 ```
 
 
@@ -30,6 +39,7 @@ Cloudformation will create the following resources as part of the AMI Builder fo
     + AWS CodePipeline - Orchestrates pipeline and listen for new commits in CodeCommit
     + Amazon SNS Topic - AMI Builds Notification via subscribed email
     + Amazon Cloudwatch Events Rule - Custom Event for AMI Builder that will trigger SNS upon AMI completion
+    + Amazon Cloudwatch Events Rule - Custom event for EC2 launch that will trigger the compliance-enforcing Lambda function
 
 
 ## HOWTO
@@ -51,13 +61,22 @@ Cloudformation will create the following resources as part of the AMI Builder fo
 * Install [GIT](https://git-scm.com/downloads) if you don't have it
 * Make sure AWS CLI is configured properly
 * [Configured AWS CLI and Git](http://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-https-unixes.html) to connect to AWS CodeCommit repositories
+* Clone this GitHub repository to your local working directory
+* Install Docker locally to build the Compliance Lambda function
 
 **Launch the Cloudformation stack**
-
-Region | AMI Builder Launch Template
-------------------------------------------------- | ---------------------------------------------------------------------------------
-N. Virginia (us-east-1) | [![Launch Stack](images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=AMI-Builder-Blogpost&templateURL=https://s3-eu-west-1.amazonaws.com/ami-builder-packer/cloudformation/pipeline.yaml)
-N. Virginia (eu-west-1) | [![Launch Stack](images/deploy-to-aws.png)](https://console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks/new?stackName=AMI-Builder-Blogpost&templateURL=https://s3-eu-west-1.amazonaws.com/ami-builder-packer/cloudformation/pipeline.yaml)
+1. From your local command line change into the ``compliance_lambda`` directory
+2. Execute the ``create-deployment-package.sh`` shell script
+3. Package the Cloudformation template to upload the Lambda deployment package to S3 and prepare the Cloudformation template to reference the uploaded ZIP file
+```bash
+aws cloudformation package --template-file cloudformation/pipeline.yaml --s3bucket "YOUR-S3-BUCKET-NAME-HERE" --output-=template-file cloudformation/pipeline-packaged.yaml
+```
+4. Generate a Base64-encoded public / private keypair for signing created AMIs
+```bash
+sh ./generate_keys.sh
+```
+5. From the AWS Management Console, open the AWS CloudFormation console and click ``Create Stack``
+6. Provide the ``pipeline-package.yaml`` file and enter in your Parameters to include the Base64-encoded public and private keys generated at step 4
 
 **To clone the AWS CodeCommit repository (console)**
 
@@ -77,9 +96,8 @@ git_repo=$(aws cloudformation describe-stacks --query 'Stacks[0].Outputs[?Output
 git clone ${git_repo}
 ```
 
-Next, we need to copy all files in this repository into the newly cloned Git repository:
+Next, we need to copy all files in the ``ami_source`` directory into the newly cloned Git repository:
 
-* Download [ami-builder-packer ZIP](https://github.com/awslabs/ami-builder-packer/archive/master.zip).
 * Extract and copy the contents to the Git repo
 
 Lastly, commit these changes to your AWS CodeCommit repo and watch the AMI being built through the AWS CodePipeline Console:
@@ -91,6 +109,12 @@ git push origin master
 ```
 
 ![AWS CodePipeline Console - AMI Builder Pipeline](images/ami-builder-pipeline.png)
+
+**Confirm compliance enforcement**
+1. Open the AWS Management Console and navigate to CloudWatch Rules
+2. Find the rule named 'ComplianceEvent' and enable it
+3. With the rule enabled launch two EC2 instances, one using the approved, signed AMI, and a second with AWS Amazon Linux
+4. While the EC2 instances are launching the signed, approved image should be allowed to launch while the other EC2 instance should be stopped before it reaches a 'Running' state
 
 ## Known issues
 
