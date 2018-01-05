@@ -419,7 +419,7 @@ Resources:
             state: 
             - "pending"
             - "running"
-        State: "ENABLED"
+        State: "DISABLED"
         Targets:
           - Id: "EC2-Compliance-Check"
             Arn: !GetAtt ComplianceLambda.Arn
